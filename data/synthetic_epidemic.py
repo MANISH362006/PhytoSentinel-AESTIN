@@ -15,7 +15,7 @@ import os
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config as cfg
+import phyto_config as cfg
 
 
 def _wind_dispersal_kernel(positions: np.ndarray, wind_vec: np.ndarray,

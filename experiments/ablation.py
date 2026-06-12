@@ -24,7 +24,7 @@ import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import config as cfg
+import phyto_config as cfg
 from train import main as train_main
 
 

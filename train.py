@@ -20,7 +20,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch_geometric.loader import DataLoader
 
-import config as cfg
+import phyto_config as cfg
 from data.synthetic_epidemic import generate_dataset
 from models.gnn import PhytoSentinelModel, PhytoGNN
 from models.senr0 import SENR0

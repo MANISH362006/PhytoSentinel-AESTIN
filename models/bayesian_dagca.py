@@ -109,7 +109,7 @@ class BayesianDAGCA(nn.Module):
         super().__init__()
         self.threshold   = threshold
         self.num_samples = num_samples
-        self.beta_head   = BetaHead(in_dim=edge_feat_dim, hidden=hidden)
+        self.beta_head   = BetaHead(in_dim=hidden, hidden=hidden)
 
         # shared feature encoder (same role as ViabilityMLP in DAGCA)
         self.encoder = nn.Sequential(

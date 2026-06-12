@@ -39,7 +39,7 @@ Open `notebooks/PhytoSentinel_AESTIN_Colab.ipynb` — everything runs in one not
 
 ```bash
 # 1. Clone
-git clone https://github.com/YOUR_USERNAME/PhytoSentinel-AESTIN.git
+git clone https://github.com/MANISH362006/PhytoSentinel-AESTIN.git
 cd PhytoSentinel-AESTIN
 
 # 2. Install

@@ -32,7 +32,7 @@ def _wind_dispersal_kernel(positions: np.ndarray, wind_vec: np.ndarray,
 
     # alignment of dispersal direction with wind direction
     wind_unit = wind_vec / (np.linalg.norm(wind_vec) + 1e-8)
-    alignment = direction @ wind_unit  # (N, N) in [-1, 1]
+    alignment = np.einsum('ijk,k->ij', direction, wind_unit)  # (N, N)
     alignment = (alignment + 1) / 2  # shift to [0, 1]
 
     # exponential distance decay

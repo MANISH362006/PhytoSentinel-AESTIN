@@ -72,21 +72,23 @@ def _beta_kl_divergence(alpha: Tensor, beta: Tensor,
     return kl.mean()
 
 
-def _sample_beta(alpha: Tensor, beta: Tensor,
-                 num_samples: int = cfg.BAYESIAN_SAMPLES) -> Tensor:
+def _sample_beta(alpha: Tensor, beta: Tensor) -> Tensor:
     """
-    Sample from Beta(α, β) via Kumaraswamy approximation (differentiable).
+    Draw a SINGLE reparameterized sample per edge via the Kumaraswamy
+    approximation to Beta(α, β):  x = (1 - u^(1/b))^(1/a),  u ~ U(0,1).
 
-    The Kumaraswamy distribution is a close approximation to Beta that admits
-    a closed-form reparameterization: x = (1 - u^(1/b))^(1/a).
+    Why a single sample (not the mean of many): averaging many draws collapses
+    the per-edge weight back toward its mean and removes the stochasticity that
+    makes this a variational/Bayesian estimator. A single reparameterized draw
+    per forward pass is the standard single-sample Monte-Carlo gradient estimator
+    (as in VAEs): genuine sample-to-sample variance now reaches the loss, and the
+    KL term regularizes the learned posterior toward the prior.
+
+    Note: Kumaraswamy(1,1) == Uniform == Beta(1,1), so at the prior the sampler
+    and the analytic Beta-Beta KL describe exactly the same distribution.
     """
-    # approximate: a ≈ α, b ≈ β  (works well for α,β > 0.5)
-    a = alpha.unsqueeze(0).expand(num_samples, -1)   # (S, E)
-    b = beta.unsqueeze(0).expand(num_samples, -1)
-
-    u = torch.zeros_like(a).uniform_().clamp(1e-6, 1 - 1e-6)
-    samples = (1 - u.pow(1.0 / b)).pow(1.0 / a)     # (S, E)
-    return samples.mean(dim=0)                        # (E,)  Monte Carlo mean
+    u = torch.empty_like(alpha).uniform_().clamp(1e-6, 1 - 1e-6)
+    return (1.0 - u.pow(1.0 / beta)).pow(1.0 / alpha)   # (E,)
 
 
 class BayesianDAGCA(nn.Module):
@@ -138,9 +140,9 @@ class BayesianDAGCA(nn.Module):
         kl = _beta_kl_divergence(alpha, beta)
 
         if self.training:
-            edge_weight = _sample_beta(alpha, beta, self.num_samples)
+            edge_weight = _sample_beta(alpha, beta)   # single reparameterized draw
         else:
-            edge_weight = alpha / (alpha + beta)   # posterior mean
+            edge_weight = alpha / (alpha + beta)      # posterior mean
 
         if prune:
             mask = edge_weight >= self.threshold
@@ -164,3 +166,14 @@ class BayesianDAGCA(nn.Module):
             var  = (alpha * beta) / ((alpha + beta) ** 2 * (alpha + beta + 1))
             std  = var.sqrt()
         return mean, std
+
+    def get_adjacency_matrix(self, edge_index: Tensor, edge_weight: Tensor,
+                             num_nodes: int) -> Tensor:
+        """
+        Build dense adjacency A[i,j] = dispersal weight, for SENR0 / spectral
+        analysis. Mirrors DAGCA.get_adjacency_matrix so SENR0 works for both
+        the deterministic and Bayesian constructors.
+        """
+        A = torch.zeros(num_nodes, num_nodes, device=edge_weight.device)
+        A[edge_index[0], edge_index[1]] = edge_weight
+        return A

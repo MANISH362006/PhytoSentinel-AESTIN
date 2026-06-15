@@ -12,7 +12,7 @@ VAL_SPLIT       = 0.15
 # TEST_SPLIT is the remainder
 
 NODE_FEAT_DIM   = 8         # per-node feature dimensions (crop health indicators)
-EDGE_FEAT_DIM   = 4         # per-edge meteorological features (wind, humidity, temp, distance)
+EDGE_FEAT_DIM   = 4         # per-edge met features: [wind_speed, humidity, wind_alignment, distance]
 NUM_CLASSES     = 2         # binary: infected / not-infected at next timestep
 
 RANDOM_SEED     = 42

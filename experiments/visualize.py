@@ -134,6 +134,41 @@ def plot_ablation_bar(results: dict, out: str = "ablation_bar.png"):
     print(f"[Fig] Saved: {path}")
 
 
+def plot_reliability_diagram(probs: np.ndarray, labels: np.ndarray,
+                             n_bins: int = 10, out: str = "reliability_diagram.png"):
+    """
+    Reliability diagram + ECE for the node-classification probabilities.
+    This is the calibration evidence that backs any uncertainty claim: a well
+    calibrated model's bars track the diagonal. Pass the *test-set* positive-class
+    probabilities and true labels (over the susceptible-node frontier).
+    """
+    import sys, os as _os
+    sys.path.append(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+    from utils.metrics import expected_calibration_error
+
+    ece, bin_conf, bin_acc, bin_cnt = expected_calibration_error(probs, labels, n_bins)
+    centers = (np.linspace(0, 1, n_bins + 1)[:-1] + np.linspace(0, 1, n_bins + 1)[1:]) / 2
+    nonempty = bin_cnt > 0
+
+    fig, ax = plt.subplots(figsize=(5.5, 5))
+    ax.plot([0, 1], [0, 1], '--', color='gray', label='Perfect calibration')
+    ax.bar(centers[nonempty], bin_acc[nonempty], width=1.0 / n_bins * 0.9,
+           color=COLORS["ours"], alpha=0.8, edgecolor='white',
+           label='Observed frequency')
+    ax.set_xlabel("Predicted probability", fontsize=12)
+    ax.set_ylabel("Observed frequency of infection", fontsize=12)
+    ax.set_title(f"Reliability Diagram (ECE = {ece:.3f})",
+                 fontsize=13, fontweight='bold')
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    ax.legend(fontsize=9, loc='upper left')
+    plt.tight_layout()
+    path = os.path.join(FIGURES_DIR, out)
+    plt.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"[Fig] Saved: {path}  (ECE={ece:.3f})")
+    return ece
+
+
 def plot_r0_distribution(r0_values: list, out: str = "r0_distribution.png"):
     """Histogram of R0 values across test graphs, with epidemic threshold line."""
     fig, ax = plt.subplots(figsize=(7, 4))
@@ -179,21 +214,17 @@ def demo_all_figures():
                 states[t, i] = states[t-1, i]
     plot_epidemic_spread(states)
 
-    # 3. ablation bar chart
-    ablation_results = {
-        "BayesDAGCA+SAGE\n(Ours)": {"f1": 0.847, "auroc": 0.912},
-        "DetDAGCA+SAGE":           {"f1": 0.821, "auroc": 0.887},
-        "NoDAGCA+SAGE":            {"f1": 0.778, "auroc": 0.851},
-        "NoDAGCA+GCN":             {"f1": 0.763, "auroc": 0.839},
-        "BayesDAGCA+GAT":          {"f1": 0.838, "auroc": 0.905},
-    }
-    plot_ablation_bar(ablation_results)
+    # 3. reliability diagram (calibration) on random demo predictions
+    demo_probs  = np.clip(np.random.beta(2, 5, 2000), 0, 1)
+    demo_labels = (np.random.random(2000) < demo_probs).astype(int)
+    plot_reliability_diagram(demo_probs, demo_labels)
 
-    # 4. R0 distribution
-    r0_values = np.random.lognormal(mean=0.1, sigma=0.4, size=200)
-    plot_r0_distribution(r0_values.tolist())
-
-    print("\nAll demo figures saved to results/figures/")
+    # NOTE: We intentionally do NOT ship placeholder ablation/R0 numbers here.
+    # Real numbers come only from train.py / experiments/ablation.py. Running the
+    # demo just exercises the plotting code with random data so figures render.
+    print("\nDemo figures saved to results/figures/")
+    print("Run `python experiments/ablation.py` for the real ablation table,")
+    print("and `python train.py` to populate real R0 values.")
 
 
 if __name__ == "__main__":

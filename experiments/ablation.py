@@ -66,6 +66,7 @@ def run_ablation(output_path: str = "results/ablation_results.csv"):
                 "F1 Score":       f"{metrics['f1']:.4f}",
                 "AUROC":          f"{metrics['auroc']:.4f}",
                 "AUPRC":          f"{metrics['auprc']:.4f}",
+                "ECE":            f"{metrics.get('ece', 0.0):.4f}",
             })
         except Exception as e:
             print(f"[ERROR] {name} failed: {e}")

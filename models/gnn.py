@@ -85,13 +85,10 @@ class PhytoGNN(nn.Module):
         self.gnn_type   = gnn_type
         self.num_layers = num_layers
 
-        # project edge features to a scalar weight supplement
-        self.edge_proj = nn.Sequential(
-            nn.Linear(edge_feat_dim, hidden // 2),
-            nn.GELU(),
-            nn.Linear(hidden // 2, 1),
-            nn.Sigmoid(),
-        )
+        # NOTE: We deliberately do NOT add a second learned edge gate here.
+        # Edge message weights come *only* from DAGCA (passed in as edge_weight),
+        # so the "DAGCA on/off" ablation isolates DAGCA's contribution rather than
+        # letting a redundant in-GNN edge projection silently relearn it.
 
         # input projection
         self.input_proj = nn.Sequential(
@@ -153,20 +150,16 @@ class PhytoGNN(nn.Module):
         """
         h = self.input_proj(x)
 
-        # combine DAGCA weights with learned edge projection
-        edge_gate = self.edge_proj(edge_attr).squeeze(-1)
-        if edge_weight is not None:
-            combined_weight = edge_weight * edge_gate
-        else:
-            combined_weight = edge_gate
-
+        # Edge weights come solely from DAGCA. When DAGCA is disabled
+        # (edge_weight is None) the SAGE/GCN backbones fall back to standard
+        # unweighted aggregation — the honest "no DAGCA" baseline.
         for i, conv in enumerate(self.convs):
             if self.gnn_type == "sage":
-                h_new = conv(h, edge_index, combined_weight)
+                h_new = conv(h, edge_index, edge_weight)
             elif self.gnn_type == "gat":
                 h_new = conv(h, edge_index, edge_attr=edge_attr)
             elif self.gnn_type == "gcn":
-                h_new = conv(h, edge_index, edge_weight=combined_weight)
+                h_new = conv(h, edge_index, edge_weight=edge_weight)
                 h_new = F.gelu(h_new)
             h = h + self.skip_proj[i](h_new)   # residual
 

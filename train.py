@@ -313,26 +313,26 @@ def _run_senr0_analysis(model, graphs, device, max_graphs: int = 50):
     constructor = model.graph_constructor
     with torch.no_grad():
         for g in graphs[:max_graphs]:
-            g = g.to(device)
-            edge_weight = _graph_constructor_weights(
-                constructor, g.edge_attr, g.edge_index)
+            # Move only the tensors we need to the device — do NOT call g.to(device),
+            # which mutates the shared graph in place and corrupts the reused split.
+            edge_attr  = g.edge_attr.to(device)
+            edge_index = g.edge_index.to(device)
+            edge_weight = _graph_constructor_weights(constructor, edge_attr, edge_index)
 
             # Build dense adjacency from the learned dispersal weights.
             A = constructor.get_adjacency_matrix(
-                g.edge_index, edge_weight, num_nodes=g.num_nodes)
+                edge_index, edge_weight, num_nodes=g.num_nodes)
 
-            r0 = float(senr0(A).item())
-            r0_values.append(r0)
+            r0_values.append(float(senr0(A).detach().cpu()))
 
     if r0_values:
         arr = np.array(r0_values)
-        n_epi = int((arr > 1.0).sum())
-        print(f"[SENR0] R0 over {len(arr)} test graphs: "
-              f"mean={arr.mean():.3f} | min={arr.min():.3f} | max={arr.max():.3f}")
-        print(f"[SENR0] {n_epi}/{len(arr)} graphs above epidemic threshold (R0>1) | "
-              f"learned beta={float(senr0.beta):.3f}, gamma={cfg.SENR0_GAMMA}")
-        print("[SENR0] (diagnostic readout from learned graph — not a "
-              "validated epidemiological R0; see README)")
+        beta = float(senr0.beta.detach())
+        print(f"[SENR0] spectral diagnostic rho((beta/gamma)*A) over {len(arr)} graphs: "
+              f"mean={arr.mean():.3f} | range=[{arr.min():.3f}, {arr.max():.3f}] "
+              f"(beta={beta:.2f}, gamma={cfg.SENR0_GAMMA})")
+        print("[SENR0] relative connectivity diagnostic from the learned graph — "
+              "NOT a validated epidemiological R0 (see README)")
     return r0_values
 
 

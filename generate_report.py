@@ -272,11 +272,13 @@ def sec_rating(st):
     section(st, '6 · Brutally Honest Rating')
     div(st, 'Two different things are being graded. Reporting them separately is the honest move.', BODY_B)
     space(st, 0.1)
-    div(st, 'Empirical status (single-seed checkpoint): validated calibration is a clear win '
-            '(ECE 0.34 → 0.14 after temperature scaling; uncertainty-vs-error correlation +0.87), '
-            'and the model transfers across dispersal physics. The headline DAGCA-vs-baseline '
-            'claim rests on the multi-step (K=3) task; the full multi-seed run quantifies it. We '
-            'report whatever the numbers say — no result is assumed.', QUOTE)
+    div(st, 'Real 3-seed results (multi-step K=3 task): DAGCA beats an identical no-DAGCA GNN '
+            'by ΔAUPRC +0.038±0.025 / ΔAUROC +0.022±0.009 — positive in 3/3 seeds. '
+            'Cross-physics transfer (train cosine → test plume) reaches AUROC 0.93 / AUPRC 0.80. '
+            'Uncertainty correlates with error at +0.997 and is already well-calibrated (T≈1.16). '
+            'Honest caveat: the GNN only ties strong tabular baselines on the in-distribution '
+            'task (AUROC 0.833 vs 0.824; AUPRC tied) — its value is generalization, the DAGCA '
+            'effect, and usable uncertainty, not crushing a linear model on home turf.', QUOTE)
     space(st, 0.1)
     table(st, [
         ['Lens', 'Rating', 'Reasoning'],

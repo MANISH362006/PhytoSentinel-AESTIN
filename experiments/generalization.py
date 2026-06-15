@@ -49,13 +49,13 @@ def _train_full_model(train_g, val_g, device, seed, epochs=None):
     train_loader = DataLoader(train_g, batch_size=cfg.BATCH_SIZE, shuffle=True)
     val_loader   = DataLoader(val_g,   batch_size=cfg.BATCH_SIZE)
 
-    best_f1, best_state, patience = -1.0, None, 0
+    best_auprc, best_state, patience = -1.0, None, 0
     for ep in range(1, epochs + 1):
         train_epoch(model, train_loader, opt, device, use_dagca=True, class_weight=cw)
         vm = eval_epoch(model, val_loader, device, use_dagca=True, class_weight=cw)
         sched.step()
-        if vm["f1"] > best_f1:
-            best_f1 = vm["f1"]
+        if vm["auprc"] > best_auprc:
+            best_auprc = vm["auprc"]
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             patience = 0
         else:

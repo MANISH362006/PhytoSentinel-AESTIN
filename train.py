@@ -188,7 +188,9 @@ def main(args, splits=None, seed: int = cfg.RANDOM_SEED, tag_suffix: str = ""):
     tag = _run_tag(args) + tag_suffix
 
     # ── Training loop ─────────────────────────────────────────────────────────
-    best_val_f1  = -1.0   # so epoch 1 always writes a checkpoint
+    # Model selection on validation AUPRC: the task is imbalanced, so AUPRC is the
+    # right ranking metric and is far more stable than F1-at-0.5 for checkpointing.
+    best_val_auprc = -1.0   # so epoch 1 always writes a checkpoint
     patience_cnt = 0
     history      = {"train": [], "val": []}
 
@@ -207,9 +209,9 @@ def main(args, splits=None, seed: int = cfg.RANDOM_SEED, tag_suffix: str = ""):
                   f"Train: {format_metrics(train_m)} | "
                   f"Val:   {format_metrics(val_m)}")
 
-        # early stopping & checkpointing
-        if val_m["f1"] > best_val_f1:
-            best_val_f1  = val_m["f1"]
+        # early stopping & checkpointing on val AUPRC
+        if val_m["auprc"] > best_val_auprc:
+            best_val_auprc = val_m["auprc"]
             patience_cnt = 0
             torch.save(model.state_dict(),
                        os.path.join(cfg.CHECKPOINT_DIR, f"best_{tag}.pt"))
@@ -239,7 +241,7 @@ def main(args, splits=None, seed: int = cfg.RANDOM_SEED, tag_suffix: str = ""):
     results = {
         "args":    vars(args),
         "test":    test_m,
-        "best_val_f1": best_val_f1,
+        "best_val_auprc": best_val_auprc,
         "n_params":    n_params,
         "r0_values":   r0_values,
     }

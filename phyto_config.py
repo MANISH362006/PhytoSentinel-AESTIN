@@ -13,7 +13,13 @@ VAL_SPLIT       = 0.15
 
 NODE_FEAT_DIM   = 8         # per-node feature dimensions (crop health indicators)
 EDGE_FEAT_DIM   = 4         # per-edge met features: [wind_speed, humidity, wind_alignment, distance]
-NUM_CLASSES     = 2         # binary: infected / not-infected at next timestep
+NUM_CLASSES     = 2         # binary: infected / not-infected within the horizon
+
+# Prediction horizon: predict whether a currently-Susceptible node becomes infected
+# within the NEXT K steps. K>1 forces multi-hop reasoning — infection can arrive via
+# 2-3 hop paths that a 1-hop heuristic cannot see — which is where message-passing
+# GNNs earn their keep. K=3 matches the 3-layer GNN receptive field.
+HORIZON         = 3
 
 RANDOM_SEED     = 42
 

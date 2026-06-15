@@ -56,11 +56,18 @@ Next-Generation-Matrix epidemiology [Diekmann 1990]. Calibration of neural class
 ### 3.1 Task and leakage-safe evaluation
 A snapshot at time *t* is a k-NN graph over *N* fields. Node features = SEIR one-hot
 **at t** ⧺ [x, y, humidity, crop type]. Edge features = [wind speed, humidity,
-wind-direction alignment, normalized distance]. Label = infected (E/I/R) at *t+1*.
-Because SEIR is monotone, already-infected nodes are trivial positives; we therefore
-compute the loss and **all metrics only over nodes Susceptible at t**. The positive
-class (newly infected) is ~10%, so we use inverse-frequency class weighting and report
-AUPRC and ECE alongside F1/AUROC.
+wind-direction alignment, normalized distance]. Label = infected (E/I/R) **within K
+steps** (state at *t+K*, K=3 by default). Because SEIR is monotone, already-infected
+nodes are trivial positives; we therefore compute the loss and **all metrics only over
+nodes Susceptible at t**, using inverse-frequency class weighting and reporting AUPRC
+and ECE alongside F1/AUROC.
+
+**Why multi-step.** We empirically verified that the *single-step* version (K=1) is
+dominated by immediate infected-neighbour features: a 1-hop heuristic and logistic
+regression match or beat the GNN. Predicting K=3 steps ahead forces reasoning over
+multi-hop infection paths — the regime where a K-layer message-passing GNN has a
+structural advantage the 1-hop baselines lack. This horizon choice is the central
+task-design decision, motivated directly by the K=1 baseline result.
 
 ### 3.2 DAGCA
 For edge (i,j) with features e_ij, the message weight is

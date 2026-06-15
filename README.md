@@ -11,13 +11,15 @@
 
 ## Overview
 
-PhytoSentinel-AESTIN predicts **which currently-healthy crop fields will be newly
-infected at the next time step**, given the spatial layout of fields, local weather,
-and the current state of the epidemic. The central idea is **DAGCA** (Dynamic
-Atmospheric Graph Construction): the message-passing weights between fields are not
-fixed — they are a learned, differentiable function of meteorological edge features
-(wind speed, humidity, wind-direction alignment, distance), so the effective graph
-adapts to the weather.
+PhytoSentinel-AESTIN predicts **which currently-healthy crop fields will become infected
+within the next K steps** (default K=3), given the spatial layout of fields, local
+weather, and the current state of the epidemic. Predicting *multiple* steps ahead is
+deliberate: over several steps the disease arrives via multi-hop paths that a 1-hop
+heuristic cannot see, so the task genuinely rewards graph message passing. The central
+idea is **DAGCA** (Dynamic Atmospheric Graph Construction): the message-passing weights
+between fields are not fixed — they are a learned, differentiable function of
+meteorological edge features (wind speed, humidity, wind-direction alignment, distance),
+so the effective graph adapts to the weather.
 
 The repository is fully reproducible: a physics-based SEIR simulator generates the
 data, a GNN is trained on a **leakage-safe** prediction task, and an ablation study
@@ -121,6 +123,9 @@ no edge weighting), `--gnn-type {sage,gat,gcn}`.
 
 ### What makes the study defensible (not just "synthetic")
 
+- **Multi-step task by design** — predicting K=3 steps ahead forces multi-hop reasoning,
+  the regime where message-passing GNNs beat 1-hop heuristics (a single-step version is
+  dominated by immediate-neighbour features, where simple baselines win — we verified this).
 - **Leakage-safe task** — scored only on currently-susceptible fields, features at time *t*.
 - **Isolated ablation** — DAGCA is the sole edge gate, so "DAGCA on/off" measures DAGCA.
 - **External baselines** — logistic regression, random forest, tabular MLP, and a

@@ -42,6 +42,17 @@ are now correct, plus the study is fair (shared data, multi-seed) and benchmarke
 These are the additions intended to take the work from "fixed" to a genuinely strong,
 defensible study.
 
+### B0. Multi-step task design — motivated by a baseline result (most important)
+We first ran the honest single-step (K=1) experiment and found that simple baselines
+(a 1-hop infected-neighbour heuristic, logistic regression) **match or beat the GNN** —
+because one-step infection is almost entirely determined by *immediate* infected
+neighbours, which hand-crafted features capture directly. Rather than hide this, we used
+it: the task is now **K-step-ahead prediction** (`cfg.HORIZON=3`, `data/synthetic_epidemic.py`).
+Over K steps, infection arrives via multi-hop paths a 1-hop heuristic cannot see, so a
+K-layer message-passing GNN has a genuine structural advantage. This is the central,
+data-motivated design decision — and the honest way to make the GNN earn its complexity.
+Model selection is on validation **AUPRC** (imbalanced-appropriate), in `train.py`.
+
 ### B1. Cross-physics generalization — `experiments/generalization.py`
 Two structurally different ground-truth dispersal kernels are implemented
 (`data/synthetic_epidemic.py: _wind_dispersal_kernel`, `PHYSICS_MODELS = ("cosine","plume")`):

@@ -162,7 +162,7 @@ def _state_one_hot(state_vec: np.ndarray) -> np.ndarray:
 
 def _build_pyg_graph(positions: np.ndarray, static_features: np.ndarray,
                      edge_feat_full: np.ndarray, current_states: np.ndarray,
-                     next_states: np.ndarray, k_neighbors: int = 10) -> Data:
+                     future_states: np.ndarray, k_neighbors: int = 10) -> Data:
     """
     Convert one simulation snapshot (state at time t) to a PyG Data object.
 
@@ -184,6 +184,13 @@ def _build_pyg_graph(positions: np.ndarray, static_features: np.ndarray,
 
     All nodes stay in the graph for message passing; the mask restricts the loss
     and metrics to the genuinely non-trivial infection frontier.
+
+    MULTI-STEP HORIZON. `future_states` is the SEIR state at time t+K (K=cfg.HORIZON).
+    The label is "infected within K steps". Because SEIR is monotone, infected-at-(t+K)
+    is equivalent to infected at any step up to t+K — i.e., the disease may arrive via a
+    multi-hop path over several steps. A 1-hop heuristic (current infected neighbours)
+    is a weak predictor of this; a K-layer message-passing GNN can see K hops out, which
+    is precisely why the graph model is expected to help here.
     """
     N = len(positions)
     dist_matrix = cdist(positions, positions)
@@ -210,8 +217,8 @@ def _build_pyg_graph(positions: np.ndarray, static_features: np.ndarray,
     node_features = np.concatenate([state_oh, static_features], 1)  # (N, 8)
     x = torch.tensor(node_features, dtype=torch.float)
 
-    # Label: will the node be infected (E/I/R) at the next step?
-    y = torch.tensor((next_states >= 1).astype(np.int64), dtype=torch.long)
+    # Label: will the node be infected (E/I/R) within the horizon (state at t+K)?
+    y = torch.tensor((future_states >= 1).astype(np.int64), dtype=torch.long)
 
     # Evaluation mask: only nodes Susceptible at t define the prediction frontier.
     eval_mask = torch.tensor(current_states == 0, dtype=torch.bool)
@@ -226,6 +233,7 @@ def generate_dataset(num_graphs: int = cfg.NUM_GRAPHS,
                      T: int = cfg.NUM_TIMESTEPS,
                      seed: int = cfg.RANDOM_SEED,
                      physics: str = "cosine",
+                     horizon: int = cfg.HORIZON,
                      verbose: bool = True) -> List[Data]:
     """
     Generate a list of PyG Data objects representing epidemic snapshots.
@@ -251,12 +259,12 @@ def generate_dataset(num_graphs: int = cfg.NUM_GRAPHS,
             N, positions, wind_vec, humidity, T=T, beta_base=beta_base, physics=physics
         )
 
-        # sample a random timestep (not last)
-        t = np.random.randint(0, T - 1)
+        # sample a timestep that leaves room for the K-step horizon
+        t = np.random.randint(0, T - horizon)
         graph = _build_pyg_graph(
             positions, static_features, edge_feat_full,
             current_states=states[t],
-            next_states=states[t + 1],
+            future_states=states[t + horizon],
         )
         graphs.append(graph)
 
@@ -268,18 +276,19 @@ def generate_dataset(num_graphs: int = cfg.NUM_GRAPHS,
         print(f"[Dataset:{physics}] Generated {len(graphs)} graphs | "
               f"nodes={N} | avg edges={sum(g.num_edges for g in graphs) // len(graphs)}")
         print(f"[Dataset:{physics}] Frontier: {n_eval} susceptible-node decisions | "
-              f"{pos_rate:.1%} newly infected at t+1 (positive class)")
+              f"{pos_rate:.1%} infected within {horizon} steps (positive class)")
     return graphs
 
 
 def make_splits(num_graphs: int = cfg.NUM_GRAPHS, seed: int = cfg.RANDOM_SEED,
-                physics: str = "cosine", verbose: bool = True):
+                physics: str = "cosine", horizon: int = cfg.HORIZON,
+                verbose: bool = True):
     """
     Build a reproducible (train, val, test) split of epidemic graphs.
     Reused across every ablation config / baseline so comparisons are fair.
     """
     graphs = generate_dataset(num_graphs=num_graphs, seed=seed,
-                              physics=physics, verbose=verbose)
+                              physics=physics, horizon=horizon, verbose=verbose)
     n_total = len(graphs)
     n_train = int(n_total * cfg.TRAIN_SPLIT)
     n_val   = int(n_total * cfg.VAL_SPLIT)

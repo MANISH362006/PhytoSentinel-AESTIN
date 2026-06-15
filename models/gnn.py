@@ -104,15 +104,16 @@ class PhytoGNN(nn.Module):
                 for _ in range(num_layers)
             ])
         elif gnn_type == "gat":
+            # concat=False averages the attention heads, so every layer outputs
+            # `hidden` channels. This keeps the residual / skip / classifier dims
+            # consistent at `hidden` (concat=True would balloon to hidden*heads and
+            # break the residual add).
             heads = cfg.GAT_HEADS
-            self.convs = nn.ModuleList()
-            for i in range(num_layers):
-                in_dim  = hidden if i == 0 else hidden * heads
-                out_dim = hidden
-                self.convs.append(GATv2Conv(in_dim, out_dim, heads=heads,
-                                            dropout=dropout, concat=True,
-                                            edge_dim=edge_feat_dim))
-            hidden = hidden * heads
+            self.convs = nn.ModuleList([
+                GATv2Conv(hidden, hidden, heads=heads, dropout=dropout,
+                          concat=False, edge_dim=edge_feat_dim)
+                for _ in range(num_layers)
+            ])
         elif gnn_type == "gcn":
             self.convs = nn.ModuleList([
                 GCNConv(hidden, hidden) for _ in range(num_layers)

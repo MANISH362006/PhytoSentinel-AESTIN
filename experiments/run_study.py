@@ -85,40 +85,56 @@ def main():
 
     os.makedirs(cfg.RESULTS_DIR, exist_ok=True)
     study = {"seeds": args.seeds}
+    out = os.path.join(cfg.RESULTS_DIR, "study_results.json")
 
-    # 1. ablation
+    def _save():
+        with open(out, "w") as f:
+            json.dump(study, f, indent=2)
+
+    # 1. ablation (the core result — save immediately after)
     agg = run_ablation_multiseed(args.seeds)
     study["ablation"] = agg
     _print_ablation(agg, len(args.seeds))
+    _save()
 
-    # 2. external baselines (on first seed's split)
-    from experiments.baselines import run_baselines, _print_table
-    base = run_baselines(seed=args.seeds[0], physics="cosine")
-    study["baselines"] = base
-    _print_table(base)
+    # 2. external baselines. Guarded so a failure can't discard the ablation.
+    try:
+        from experiments.baselines import run_baselines, _print_table
+        base = run_baselines(seed=args.seeds[0], physics="cosine")
+        study["baselines"] = base
+        _print_table(base)
+        _save()
+    except Exception as e:
+        print(f"[Study] Baselines stage failed (kept ablation): {e}")
 
     # 3. cross-physics generalization
     if not args.quick and not args.skip_generalization:
-        from experiments.generalization import run_generalization
-        study["generalization"] = run_generalization(seed=args.seeds[0])
+        try:
+            from experiments.generalization import run_generalization
+            study["generalization"] = run_generalization(seed=args.seeds[0])
+            _save()
+        except Exception as e:
+            print(f"[Study] Generalization stage failed (kept prior results): {e}")
 
     # 4. validated calibration
     if not args.quick:
-        from torch_geometric.loader import DataLoader
-        import torch
-        from experiments.generalization import _train_full_model
-        from experiments.calibration import analyze_calibration
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        tr, va, te = make_splits(seed=args.seeds[0], physics="cosine")
-        model, _ = _train_full_model(tr, va, device, args.seeds[0])
-        study["calibration"] = analyze_calibration(
-            model, DataLoader(va, batch_size=cfg.BATCH_SIZE),
-            DataLoader(te, batch_size=cfg.BATCH_SIZE), device,
-            use_dagca=True, tag="cosine")
+        try:
+            from torch_geometric.loader import DataLoader
+            import torch
+            from experiments.generalization import _train_full_model
+            from experiments.calibration import analyze_calibration
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            tr, va, te = make_splits(seed=args.seeds[0], physics="cosine")
+            model, _ = _train_full_model(tr, va, device, args.seeds[0])
+            study["calibration"] = analyze_calibration(
+                model, DataLoader(va, batch_size=cfg.BATCH_SIZE),
+                DataLoader(te, batch_size=cfg.BATCH_SIZE), device,
+                use_dagca=True, tag="cosine")
+            _save()
+        except Exception as e:
+            print(f"[Study] Calibration stage failed (kept prior results): {e}")
 
-    out = os.path.join(cfg.RESULTS_DIR, "study_results.json")
-    with open(out, "w") as f:
-        json.dump(study, f, indent=2)
+    _save()
     print(f"\n[Study] Complete. Full results saved to {out}")
     print("[Study] Figures in results/figures/ ; per-run JSON in results/")
 

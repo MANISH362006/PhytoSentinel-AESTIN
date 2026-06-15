@@ -286,9 +286,9 @@ def _save_reliability(model, loader, device, use_dagca: bool, tag: str):
         print(f"[Calib] Skipped reliability diagram ({e}).")
 
 
-def _graph_constructor_weights(model, edge_attr, edge_index):
+def _graph_constructor_weights(constructor, edge_attr, edge_index):
     """Run the (Bayesian or deterministic) DAGCA constructor, return edge weights."""
-    out = model.graph_constructor(edge_attr, edge_index)
+    out = constructor(edge_attr, edge_index)
     # BayesianDAGCA returns (attr_w, weight, index, kl); DAGCA returns (attr_w, weight, index)
     return out[1]
 

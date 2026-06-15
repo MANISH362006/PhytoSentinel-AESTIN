@@ -27,7 +27,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import phyto_config as cfg
 from data.synthetic_epidemic import make_splits
-from utils.metrics import expected_calibration_error
+from utils.metrics import expected_calibration_error, precision_at_budget
 
 
 # ── feature engineering ─────────────────────────────────────────────────────────
@@ -101,6 +101,7 @@ def _metrics_from_probs(probs, y_true, threshold=0.5):
     except ValueError:
         auroc = auprc = 0.0
     ece, *_ = expected_calibration_error(probs, y_true)
+    pab = precision_at_budget(probs, y_true)
     return {
         "acc":       float((preds == y_true).mean()),
         "f1":        float(f1_score(y_true, preds, zero_division=0)),
@@ -109,6 +110,8 @@ def _metrics_from_probs(probs, y_true, threshold=0.5):
         "auroc":     float(auroc),
         "auprc":     float(auprc),
         "ece":       float(ece),
+        "prec@10":   pab["prec@10"],
+        "recall@10": pab["recall@10"],
     }
 
 
@@ -170,10 +173,11 @@ def run_baselines(seed: int = cfg.RANDOM_SEED, physics: str = "cosine",
 
 
 def _print_table(results):
-    print(f"\n{'Baseline':28s} {'F1':>7} {'AUROC':>7} {'AUPRC':>7} {'ECE':>7}")
-    print("-" * 60)
+    print(f"\n{'Baseline':28s} {'F1':>7} {'AUROC':>7} {'AUPRC':>7} {'ECE':>7} {'P@10':>7} {'R@10':>7}")
+    print("-" * 76)
     for name, m in results.items():
-        print(f"{name:28s} {m['f1']:7.4f} {m['auroc']:7.4f} {m['auprc']:7.4f} {m['ece']:7.4f}")
+        print(f"{name:28s} {m['f1']:7.4f} {m['auroc']:7.4f} {m['auprc']:7.4f} "
+              f"{m['ece']:7.4f} {m.get('prec@10',0):7.4f} {m.get('recall@10',0):7.4f}")
 
 
 if __name__ == "__main__":

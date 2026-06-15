@@ -29,7 +29,8 @@ from torch_geometric.loader import DataLoader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import phyto_config as cfg
-from utils.metrics import expected_calibration_error
+from utils.metrics import (expected_calibration_error, selective_risk_coverage,
+                           precision_at_budget)
 from train import _masked
 
 FIGDIR = "results/figures"
@@ -95,24 +96,36 @@ def analyze_calibration(model, val_loader, test_loader, device, use_dagca,
     # Spearman-like monotonicity: correlation between uncertainty rank and error
     corr = float(np.corrcoef(bin_unc, bin_err)[0, 1]) if nb > 1 else 0.0
 
+    # selective prediction (uncertainty utility) + decision metric
+    sel = selective_risk_coverage(probs_raw[:, 1], yte, ent)
+    budget = precision_at_budget(probs_raw[:, 1], yte)
+
     _plot(probs_raw[:, 1], probs_ts[:, 1], yte, bin_unc, bin_err,
-          ece_raw, ece_ts, corr, T, tag)
+          ece_raw, ece_ts, corr, T, tag, sel)
 
     out = {
         "ece_raw": float(ece_raw),
         "ece_temp_scaled": float(ece_ts),
         "temperature": float(T),
         "uncertainty_error_corr": corr,
+        "selective": sel,
+        "precision_at_budget": budget,
     }
     print(f"[Calibration] ECE raw={ece_raw:.4f} -> temp-scaled={ece_ts:.4f} (T={T:.3f}) | "
           f"uncertainty-vs-error corr={corr:+.3f}")
+    print(f"[Selective] acc full={sel['acc_full']:.4f} -> acc@80%%coverage={sel['acc_at_80cov']:.4f} "
+          f"| AURC={sel['aurc']:.4f} vs random={sel['aurc_random']:.4f} "
+          f"({'uncertainty IS useful' if sel['aurc'] < sel['aurc_random'] else 'no gain'})")
+    print(f"[Decision] precision@10%% budget={budget['prec@10']:.3f} "
+          f"(recall@10%%={budget['recall@10']:.3f})")
     return out
 
 
-def _plot(p_raw, p_ts, y, bin_unc, bin_err, ece_raw, ece_ts, corr, T, tag):
+def _plot(p_raw, p_ts, y, bin_unc, bin_err, ece_raw, ece_ts, corr, T, tag, sel=None):
     import matplotlib.pyplot as plt
     os.makedirs(FIGDIR, exist_ok=True)
-    fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+    npan = 3 if sel is not None else 2
+    fig, ax = plt.subplots(1, npan, figsize=(5.4 * npan, 4))
 
     # reliability (raw vs temp-scaled)
     for probs, lbl, c in [(p_raw, f'raw (ECE={ece_raw:.3f})', '#2196F3'),
@@ -129,6 +142,17 @@ def _plot(p_raw, p_ts, y, bin_unc, bin_err, ece_raw, ece_ts, corr, T, tag):
     ax[1].plot(bin_unc, bin_err, 'o-', color='#E65100')
     ax[1].set_xlabel('Predictive entropy (uncertainty)'); ax[1].set_ylabel('Error rate')
     ax[1].set_title(f'Uncertainty vs Error (corr={corr:+.2f})', fontweight='bold')
+
+    # selective prediction risk-coverage
+    if sel is not None:
+        ax[2].plot(sel['coverage'], sel['risk'], '-', color='#6A1B9A',
+                   label=f"by uncertainty (AURC={sel['aurc']:.3f})")
+        ax[2].axhline(1 - sel['acc_full'], color='gray', linestyle='--',
+                      label=f"no abstention (err={1-sel['acc_full']:.3f})")
+        ax[2].set_xlabel('Coverage (fraction predicted)')
+        ax[2].set_ylabel('Selective error')
+        ax[2].set_title('Selective Prediction', fontweight='bold')
+        ax[2].legend(fontsize=8)
 
     plt.tight_layout()
     path = os.path.join(FIGDIR, f'calibration_validation{("_"+tag) if tag else ""}.png')

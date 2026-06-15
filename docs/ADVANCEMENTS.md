@@ -79,6 +79,20 @@ cross-physics generalization, and calibration — writing `results/study_results
 all figures. Every config in a seed trains on identical graphs; seeds {42,43,44} give
 statistical honesty rather than single-run numbers.
 
+### B6. Uncertainty is decision-useful — `utils/metrics.py` + `experiments/calibration.py`
+Beyond ECE, we show the uncertainty *does work*: (i) **selective prediction** — abstaining
+on the least-confident predictions traces a risk-coverage curve with AURC far below random
+abstention, and accuracy at 80% coverage well above full-coverage accuracy (the model knows
+when it doesn't know); (ii) **Precision@budget** — under a top-5/10/20% intervention budget
+we report precision/recall, the operationally relevant quantity. This gives the Bayesian
+component a concrete reason to exist even though the deterministic variant can edge it on
+raw accuracy, and reframes the work around utility rather than a single AUROC.
+
+### B7. Effect size & consistency — `experiments/run_study.py`
+The headline DAGCA claim is reported as a paired per-seed effect (DetDAGCA − NoDAGCA) with
+mean ± std and the count of seeds in which it is positive — a defensible consistency
+statement rather than one noisy number.
+
 ### B4. Honest spectral diagnostic — `models/senr0.py` + `train.py`
 The real Next-Generation-Matrix spectral radius now runs on the learned adjacency, and is
 consistently labelled a **diagnostic**, not a validated R₀, in code comments, README, and

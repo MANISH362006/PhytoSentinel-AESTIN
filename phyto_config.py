@@ -46,7 +46,7 @@ GAT_HEADS       = 4
 SENR0_GAMMA     = 0.1       # recovery rate (used in R0 = lambda_max / gamma)
 
 # ── Training ──────────────────────────────────────────────────────────────────
-EPOCHS          = 100
+EPOCHS          = 150       # DAGCA configs were still improving at 100 (undertrained)
 BATCH_SIZE      = 32
 LR              = 3e-4
 WEIGHT_DECAY    = 1e-5

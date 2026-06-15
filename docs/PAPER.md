@@ -106,6 +106,20 @@ matrix; off-diagonal = OOD. `[RUN — experiments/generalization.py]`
 **4.4 Validated calibration (Fig).** ECE raw vs temperature-scaled; error rises with
 predictive uncertainty. `[RUN — experiments/calibration.py]`
 
+**4.5 Uncertainty is decision-useful (selective prediction).** Ranking predictions by
+predictive entropy and abstaining on the least-confident fraction yields a risk-coverage
+curve with AURC far below the random-abstention baseline, and accuracy at 80% coverage
+well above full-coverage accuracy. This is the result that justifies the Bayesian
+component operationally: the model knows when it doesn't know. `[RUN]`
+
+**4.6 Operational metric (Precision@budget).** Under a realistic intervention budget
+(treat the top 5/10/20% highest-risk fields), we report precision and recall — the
+quantity a grower with limited spraying capacity actually optimizes. `[RUN]`
+
+**4.7 Effect size & consistency.** We report the paired DAGCA effect (DetDAGCA −
+NoDAGCA) per seed with mean ± std and the number of seeds in which it is positive,
+so the central claim is a consistency statement, not a single noisy number. `[RUN]`
+
 ## 5. Limitations
 Synthetic data only (mitigated, not solved, by cross-physics transfer); SENR0 is a
 diagnostic, not a validated R₀; real-world spatial data and field deployment are future

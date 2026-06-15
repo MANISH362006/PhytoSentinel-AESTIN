@@ -47,7 +47,7 @@ class Args:
 
 
 def run_ablation_multiseed(seeds):
-    """Return {config_name: {metric: (mean, std)}} aggregated over seeds."""
+    """Return (agg, raw): aggregated mean/std and the raw per-seed metric lists."""
     raw = {name: {m: [] for m in METRICS} for name, *_ in ABLATION}
 
     for seed in seeds:
@@ -62,7 +62,31 @@ def run_ablation_multiseed(seeds):
 
     agg = {name: {m: (float(np.mean(v[m])), float(np.std(v[m]))) for m in METRICS}
            for name, v in raw.items()}
-    return agg
+    return agg, raw
+
+
+def _dagca_effect(raw, seeds):
+    """
+    Per-seed paired effect of DAGCA: DetDAGCA+SAGE minus NoDAGCA+SAGE on AUPRC/AUROC.
+    Reports mean effect and how many seeds it is positive in — a defensible
+    significance-style statement instead of a single noisy number.
+    """
+    treat, ctrl = "DetDAGCA+SAGE", "NoDAGCA+SAGE"
+    if treat not in raw or ctrl not in raw:
+        return {}
+    eff = {}
+    for m in ("auprc", "auroc", "f1"):
+        d = np.array(raw[treat][m]) - np.array(raw[ctrl][m])
+        eff[m] = {"mean_delta": float(d.mean()),
+                  "std_delta": float(d.std()),
+                  "positive_in": f"{int((d > 0).sum())}/{len(d)} seeds"}
+    print("\n" + "=" * 64)
+    print(f"DAGCA EFFECT  ({treat}  -  {ctrl}), paired over {len(seeds)} seed(s)")
+    print("=" * 64)
+    for m, e in eff.items():
+        print(f"  d{m.upper():5s} = {e['mean_delta']:+.4f} ± {e['std_delta']:.4f}  "
+              f"(positive in {e['positive_in']})")
+    return eff
 
 
 def _print_ablation(agg, n_seeds):
@@ -92,9 +116,10 @@ def main():
             json.dump(study, f, indent=2)
 
     # 1. ablation (the core result — save immediately after)
-    agg = run_ablation_multiseed(args.seeds)
+    agg, raw = run_ablation_multiseed(args.seeds)
     study["ablation"] = agg
     _print_ablation(agg, len(args.seeds))
+    study["dagca_effect"] = _dagca_effect(raw, args.seeds)
     _save()
 
     # 2. external baselines. Guarded so a failure can't discard the ablation.

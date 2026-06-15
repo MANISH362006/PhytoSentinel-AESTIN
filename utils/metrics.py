@@ -39,6 +39,63 @@ def expected_calibration_error(probs: np.ndarray, y_true: np.ndarray,
     return ece, bin_conf, bin_acc, bin_cnt
 
 
+def precision_at_budget(probs: np.ndarray, y_true: np.ndarray,
+                        budgets=(0.05, 0.10, 0.20)) -> dict:
+    """
+    Decision-relevant metric: if you can only intervene on the top-fraction of
+    fields ranked by predicted risk, what precision / recall do you get?
+    This is the metric a farmer with a limited spraying budget actually cares about.
+    """
+    order = np.argsort(-probs)            # highest risk first
+    n = len(probs)
+    total_pos = max(int(y_true.sum()), 1)
+    out = {}
+    for b in budgets:
+        k = max(int(round(b * n)), 1)
+        topk = order[:k]
+        pct = int(round(b * 100))
+        out[f"prec@{pct}"]   = float(y_true[topk].mean())
+        out[f"recall@{pct}"] = float(y_true[topk].sum() / total_pos)
+    return out
+
+
+def selective_risk_coverage(probs: np.ndarray, y_true: np.ndarray,
+                            uncertainty: np.ndarray) -> dict:
+    """
+    Selective prediction: rank predictions by confidence (ascending uncertainty)
+    and let the model ABSTAIN on its least-confident cases. Reports:
+      - aurc            : area under the risk-coverage curve (lower = uncertainty is useful)
+      - aurc_random     : same, but abstaining at random (baseline to beat)
+      - acc_at_80cov    : accuracy on the 80% most-confident predictions
+      - acc_full        : accuracy with no abstention (100% coverage)
+    If aurc << aurc_random and acc_at_80cov > acc_full, the uncertainty is decision-useful.
+    """
+    preds = (probs >= 0.5).astype(int)
+    err = (preds != y_true).astype(float)
+    n = len(err)
+
+    order = np.argsort(uncertainty)                    # most confident first
+    err_sorted = err[order]
+    cov = np.arange(1, n + 1) / n
+    risk = np.cumsum(err_sorted) / np.arange(1, n + 1)
+    aurc = float(np.trapz(risk, cov))
+
+    rng = np.random.RandomState(0)
+    rand_risk = np.cumsum(err[rng.permutation(n)]) / np.arange(1, n + 1)
+    aurc_random = float(np.trapz(rand_risk, cov))
+
+    k80 = max(int(0.8 * n), 1)
+    return {
+        "aurc":         aurc,
+        "aurc_random":  aurc_random,
+        "acc_at_80cov": float(1.0 - err_sorted[:k80].mean()),
+        "acc_full":     float(1.0 - err.mean()),
+        # decimated curves for plotting
+        "coverage":     cov[::max(1, n // 50)].tolist(),
+        "risk":         risk[::max(1, n // 50)].tolist(),
+    }
+
+
 def compute_metrics(logits: Tensor, labels: Tensor) -> dict:
     """
     Compute classification metrics from raw logits and true labels.

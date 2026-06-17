@@ -132,14 +132,30 @@ def main():
     except Exception as e:
         print(f"[Study] Baselines stage failed (kept ablation): {e}")
 
-    # 3. cross-physics generalization
+    # 3. cross-physics generalization (GNN) + baselines under the same OOD protocol
     if not args.quick and not args.skip_generalization:
         try:
             from experiments.generalization import run_generalization
-            study["generalization"] = run_generalization(seed=args.seeds[0])
+            gnn_matrix = run_generalization(seed=args.seeds[0])
+            study["generalization"] = gnn_matrix
+            _save()
+            # decisive comparison: do tabular baselines transfer across physics too?
+            from experiments.baselines import run_baselines_cross_physics, _print_cross_physics
+            base_xphys = run_baselines_cross_physics(seed=args.seeds[0])
+            study["baselines_cross_physics"] = base_xphys
+            _print_cross_physics(base_xphys, gnn_matrix)
             _save()
         except Exception as e:
             print(f"[Study] Generalization stage failed (kept prior results): {e}")
+
+    # 3b. SENR0 validation: does the learned spectral radius track epidemic severity?
+    if not args.quick:
+        try:
+            from experiments.senr0_validation import validate_senr0
+            study["senr0_validation"] = validate_senr0(seed=args.seeds[0])
+            _save()
+        except Exception as e:
+            print(f"[Study] SENR0-validation stage failed (kept prior results): {e}")
 
     # 4. validated calibration
     if not args.quick:

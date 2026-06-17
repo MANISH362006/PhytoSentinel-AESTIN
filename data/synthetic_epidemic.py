@@ -162,7 +162,8 @@ def _state_one_hot(state_vec: np.ndarray) -> np.ndarray:
 
 def _build_pyg_graph(positions: np.ndarray, static_features: np.ndarray,
                      edge_feat_full: np.ndarray, current_states: np.ndarray,
-                     future_states: np.ndarray, k_neighbors: int = 10) -> Data:
+                     future_states: np.ndarray, k_neighbors: int = 10,
+                     beta_true: float = 0.0) -> Data:
     """
     Convert one simulation snapshot (state at time t) to a PyG Data object.
 
@@ -225,6 +226,7 @@ def _build_pyg_graph(positions: np.ndarray, static_features: np.ndarray,
 
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y,
                 eval_mask=eval_mask,
+                beta_true=torch.tensor([beta_true], dtype=torch.float),
                 pos=torch.tensor(positions, dtype=torch.float))
 
 
@@ -265,6 +267,7 @@ def generate_dataset(num_graphs: int = cfg.NUM_GRAPHS,
             positions, static_features, edge_feat_full,
             current_states=states[t],
             future_states=states[t + horizon],
+            beta_true=float(beta_base),
         )
         graphs.append(graph)
 

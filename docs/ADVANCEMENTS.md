@@ -100,6 +100,20 @@ we report precision/recall, the operationally relevant quantity. This gives the 
 component a concrete reason to exist even though the deterministic variant can edge it on
 raw accuracy, and reframes the work around utility rather than a single AUROC.
 
+### B8. Baselines under cross-physics — the decisive "why GNN?" test — `experiments/baselines.py`
+The GNN only ties tabular baselines in-distribution, which invites "why not logistic
+regression?". `run_baselines_cross_physics` puts every baseline through the *same*
+train-physics→test-physics OOD protocol as the GNN. If the baselines collapse OOD while
+the GNN holds (cosine→plume AUPRC 0.80), the GNN's justification becomes robustness and
+transferability — a concrete, defensible answer rather than a marginal in-distribution win.
+`run_study.py` prints the baseline-vs-GNN OOD table side by side.
+
+### B9. SENR0 validation — `experiments/senr0_validation.py`
+Tests whether the learned spectral radius ρ(A) correlates with observed epidemic severity
+per graph (Pearson + Spearman). A positive correlation upgrades SENR0 from an asserted
+diagnostic to a *meaningful* severity indicator. The simulator's true β is also stored per
+graph (`data.beta_true`) for a secondary check. Reported honestly whichever way it lands.
+
 ### B7. Effect size & consistency — `experiments/run_study.py`
 The headline DAGCA claim is reported as a paired per-seed effect (DetDAGCA − NoDAGCA) with
 mean ± std and the count of seeds in which it is positive — a defensible consistency

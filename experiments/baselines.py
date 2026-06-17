@@ -172,6 +172,65 @@ def run_baselines(seed: int = cfg.RANDOM_SEED, physics: str = "cosine",
     return results
 
 
+def run_baselines_cross_physics(seed: int = cfg.RANDOM_SEED,
+                                physics_models=("cosine", "plume")):
+    """
+    Train each non-GNN baseline on ONE physics and test on every physics — the same
+    out-of-distribution protocol used for the GNN (experiments/generalization.py).
+
+    The decisive question for "why a GNN?": do the strong tabular baselines transfer
+    across dispersal physics as well as the GNN does? Returns
+    {train_physics: {test_physics: {model: auprc}}}.
+    """
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+
+    # cache (X, y) per physics so we build each split once
+    xy = {}
+    for p in physics_models:
+        tr, _, te = make_splits(seed=seed, physics=p)
+        xy[p] = {"train": graphs_to_xy(tr), "test": graphs_to_xy(te)}
+
+    matrix = {}
+    for train_p in physics_models:
+        Xtr, ytr = xy[train_p]["train"]
+        scaler = StandardScaler().fit(Xtr)
+        lr = LogisticRegression(max_iter=1000, class_weight="balanced").fit(scaler.transform(Xtr), ytr)
+        rf = RandomForestClassifier(n_estimators=300, class_weight="balanced",
+                                    random_state=seed, n_jobs=-1).fit(Xtr, ytr)
+        smax = Xtr[:, 5].max() + 1e-8   # heuristic uses weighted-infected score column
+
+        matrix[train_p] = {}
+        for test_p in physics_models:
+            Xte, yte = xy[test_p]["test"]
+            matrix[train_p][test_p] = {
+                "LogReg":    _metrics_from_probs(lr.predict_proba(scaler.transform(Xte))[:, 1], yte)["auprc"],
+                "RandomForest": _metrics_from_probs(rf.predict_proba(Xte)[:, 1], yte)["auprc"],
+                "Heuristic": _metrics_from_probs(np.clip(Xte[:, 5] / smax, 0, 1), yte)["auprc"],
+            }
+    return matrix
+
+
+def _print_cross_physics(matrix, gnn_matrix=None):
+    phys = list(matrix.keys())
+    print("\n" + "=" * 70)
+    print("CROSS-PHYSICS TRANSFER — baselines vs GNN (AUPRC; off-diagonal = OOD)")
+    print("=" * 70)
+    for tr in phys:
+        for te in phys:
+            tag = "in-dist" if tr == te else "OOD"
+            b = matrix[tr][te]
+            line = (f"train {tr:6s} -> test {te:6s} [{tag:7s}] | "
+                    f"LogReg={b['LogReg']:.3f}  RF={b['RandomForest']:.3f}  "
+                    f"Heur={b['Heuristic']:.3f}")
+            if gnn_matrix is not None:
+                line += f"  | GNN={gnn_matrix[tr][te]['auprc']:.3f}"
+            print(line)
+    print("If the GNN's OOD (off-diagonal) AUPRC exceeds the baselines', the GNN "
+          "transfers across physics better than tabular models — the key 'why GNN' answer.")
+
+
 def _print_table(results):
     print(f"\n{'Baseline':28s} {'F1':>7} {'AUROC':>7} {'AUPRC':>7} {'ECE':>7} {'P@10':>7} {'R@10':>7}")
     print("-" * 76)

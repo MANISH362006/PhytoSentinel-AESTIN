@@ -148,6 +148,19 @@ GNN reaches precision 0.68 / recall 0.30 — i.e., treating the 10% highest-risk
 catches ~30% of all next-3-step infections at ~68% precision, the quantity a grower with
 limited spraying capacity optimizes.
 
+**4.6 Why a GNN? — baselines vs GNN under cross-physics transfer.** We run the tabular
+baselines through the *same* train-physics→test-physics protocol as the GNN
+(`experiments/baselines.py::run_baselines_cross_physics`). The question this answers is
+the central "why not just use logistic regression": if the baselines transfer across
+dispersal physics as well as the GNN, the GNN is not justified; if they degrade OOD while
+the GNN holds, the GNN's value is robustness/transferability. `[RUN — run_study.py prints
+the baseline-vs-GNN OOD table]`
+
+**4.7 SENR0 validation.** We test whether the learned spectral radius ρ(A) tracks observed
+epidemic severity per graph (fraction of the frontier that becomes infected). A positive
+Pearson/Spearman correlation upgrades SENR0 from an asserted diagnostic to a *meaningful*
+epidemic-severity indicator. `[RUN — experiments/senr0_validation.py]`
+
 ## 5. Limitations
 Synthetic data only (mitigated, not solved, by cross-physics transfer); SENR0 is a
 diagnostic, not a validated R₀; real-world spatial data and field deployment are future
